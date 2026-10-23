@@ -1,0 +1,228 @@
+<?php
+// DevOrbit 2.0 shared UI helpers. Every function is read-only or presentational.
+
+function ob_icon(string $n, int $s = 18): string {
+  static $P = [
+    'home'=>'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+    'compass'=>'<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>',
+    'users'=>'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.5c2 .7 3.5 2.6 3.5 5.5"/>',
+    'trophy'=>'<path d="M8 4h8v6a4 4 0 01-8 0z"/><path d="M8 6H4v2a3 3 0 003 3M16 6h4v2a3 3 0 01-3 3"/><path d="M12 14v4M8 21h8"/>',
+    'grid'=>'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+    'flag'=>'<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+    'upload'=>'<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/>',
+    'check'=>'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/>',
+    'wallet'=>'<path d="M3 7a2 2 0 012-2h13v4"/><path d="M3 7v11a2 2 0 002 2h15V9H5a2 2 0 01-2-2z"/><circle cx="16.5" cy="14.5" r="1"/>',
+    'card'=>'<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/>',
+    'list'=>'<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>',
+    'spark'=>'<path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z"/>',
+    'bell'=>'<path d="M6 16v-5a6 6 0 1112 0v5l2 2H4z"/><path d="M10 21h4"/>',
+    'sliders'=>'<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+    'search'=>'<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
+    'plus'=>'<path d="M12 5v14M5 12h14"/>',
+    'chev'=>'<path d="M15 6l-6 6 6 6"/>',
+    'menu'=>'<path d="M4 6h16M4 12h16M4 18h16"/>',
+    'ext'=>'<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>',
+    'logout'=>'<path d="M9 4H5a1 1 0 00-1 1v14a1 1 0 001 1h4"/><path d="M16 8l4 4-4 4M20 12H9"/>',
+    'user'=>'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>',
+    'tiles'=>'<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>',
+    'clock'=>'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    'sun'=>'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    'moon'=>'<path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/>',
+    'inbox'=>'<path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/>',
+    'link'=>'<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3A4 4 0 0011 18.7l1-1"/>',
+  ];
+  return '<svg class="ic" width="'.$s.'" height="'.$s.'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'.($P[$n] ?? $P['flag']).'</svg>';
+}
+
+function ob_initials(string $name): string {
+  $parts = preg_split('/\s+/', trim($name)) ?: [];
+  $a = mb_substr($parts[0] ?? '?', 0, 1);
+  $b = count($parts) > 1 ? mb_substr(end($parts), 0, 1) : '';
+  return mb_strtoupper($a.$b);
+}
+
+function ob_label(string $s): string { return ucfirst(str_replace('_', ' ', $s)); }
+
+// Status pill. Tone classes are styled in ob2.css.
+function ob_badge(string $status): string {
+  static $tone = [
+    'open'=>'green','paid'=>'green','verified'=>'green','confirmed'=>'green','approved'=>'purple','active'=>'green',
+    'in_review'=>'amber','payment_pending'=>'amber','changes_requested'=>'amber','pending'=>'amber','prepared'=>'amber','submitted'=>'blue',
+    'rejected'=>'red','failed'=>'red','draft'=>'gray','closed'=>'gray',
+  ];
+  return '<span class="ob-badge '.($tone[$status] ?? 'gray').'">'.e(ob_label($status)).'</span>';
+}
+
+function ob_diff(?string $d): string {
+  if (!$d) return '';
+  $map = ['beginner'=>'green','intermediate'=>'amber','advanced'=>'red'];
+  $label = $d === 'beginner' ? 'Beginner friendly' : ucfirst($d);
+  return '<span class="ob-badge '.($map[$d] ?? 'gray').'">'.e($label).'</span>';
+}
+
+function ob_empty(string $icon, string $title, string $text = '', string $actionHtml = ''): string {
+  return '<div class="ob-empty"><div class="ob-empty-ic">'.ob_icon($icon, 26).'</div><h3>'.e($title).'</h3>'.($text !== '' ? '<p>'.e($text).'</p>' : '').$actionHtml.'</div>';
+}
+
+function ob_ago(?string $ts): string {
+  if (!$ts) return '';
+  $t = strtotime($ts); if (!$t) return '';
+  $d = time() - $t;
+  if ($d < 60) return 'just now';
+  if ($d < 3600) return floor($d / 60).' min ago';
+  if ($d < 86400) return floor($d / 3600).' h ago';
+  if ($d < 86400 * 30) return floor($d / 86400).' d ago';
+  return date('M j, Y', $t);
+}
+
+function ob_date(?string $ts, string $fmt = 'M j, Y'): string { $t = $ts ? strtotime($ts) : false; return $t ? date($fmt, $t) : '—'; }
+
+function ob_deadline(?string $ts): string {
+  if (!$ts) return '<span class="ob-muted">No deadline</span>';
+  $t = strtotime($ts); if (!$t) return '';
+  $left = $t - time();
+  if ($left < 0) return '<span class="ob-late">Ended '.e(date('M j', $t)).'</span>';
+  $days = (int)ceil($left / 86400);
+  return '<span class="'.($days <= 3 ? 'ob-soon' : '').'">'.($days <= 1 ? 'Due today' : $days.' days left').'</span>';
+}
+
+function ob_page_head(string $title, string $sub = '', string $actions = ''): string {
+  return '<div class="ob-head"><div><h2>'.e($title).'</h2>'.($sub !== '' ? '<p class="ob-muted">'.e($sub).'</p>' : '').'</div>'.($actions !== '' ? '<div class="ob-head-actions">'.$actions.'</div>' : '').'</div>';
+}
+
+// Pagination links that keep the other query parameters.
+function ob_pager(int $total, int $per, int $page, array $params = []): string {
+  $pages = max(1, (int)ceil($total / $per));
+  if ($pages <= 1) return '';
+  $url = function (int $p) use ($params) { $q = array_filter($params, fn($v) => $v !== '' && $v !== null); $q['page'] = $p; return '?'.http_build_query($q); };
+  $out = '<nav class="ob-pager" aria-label="Pagination">';
+  $out .= $page > 1 ? '<a href="'.e($url($page - 1)).'">← Prev</a>' : '<span class="off">← Prev</span>';
+  $from = max(1, $page - 2); $to = min($pages, $page + 2);
+  if ($from > 1) $out .= '<a href="'.e($url(1)).'">1</a>'.($from > 2 ? '<span class="off">…</span>' : '');
+  for ($i = $from; $i <= $to; $i++) $out .= $i === $page ? '<span class="cur" aria-current="page">'.$i.'</span>' : '<a href="'.e($url($i)).'">'.$i.'</a>';
+  if ($to < $pages) $out .= ($to < $pages - 1 ? '<span class="off">…</span>' : '').'<a href="'.e($url($pages)).'">'.$pages.'</a>';
+  $out .= $page < $pages ? '<a href="'.e($url($page + 1)).'">Next →</a>' : '<span class="off">Next →</span>';
+  return $out.'</nav>';
+}
+
+function ob_page_param(): int { $p = filter_input(INPUT_GET, 'page', FILTER_VALIDATE_INT); return ($p && $p > 0 && $p < 100000) ? $p : 1; }
+
+// Schema feature checks so pages keep working before the 2.0 migration is applied.
+function ob_table_exists(string $t): bool {
+  static $c = [];
+  if (isset($c[$t])) return $c[$t];
+  try { $s = db()->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?'); $s->execute([$t]); return $c[$t] = ((int)$s->fetchColumn() > 0); }
+  catch (Throwable $e) { return $c[$t] = false; }
+}
+function ob_col_exists(string $t, string $col): bool {
+  static $c = [];
+  $k = $t.'.'.$col;
+  if (isset($c[$k])) return $c[$k];
+  try { $s = db()->prepare('SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?'); $s->execute([$t, $col]); return $c[$k] = ((int)$s->fetchColumn() > 0); }
+  catch (Throwable $e) { return $c[$k] = false; }
+}
+function ob_migration_notice(): string {
+  return '<div class="ob-flash info">This feature needs the DevOrbit 2.0 database migration. Run <code>database/migrations/002_openbounty_2_0.sql</code> once (it only adds tables and columns).</div>';
+}
+
+// Stellar Testnet explorer link, only when a real hash exists.
+function ob_tx_url(?string $hash): ?string {
+  if (!$hash || !preg_match('/^[A-Za-z0-9]{32,128}$/', $hash)) return null;
+  return 'https://stellar.expert/explorer/testnet/tx/'.rawurlencode($hash);
+}
+function ob_valid_stellar_key(string $k): bool {
+  if (!preg_match('/^G[A-Z2-7]{55}$/', $k)) return false;
+
+  $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  $buffer = 0;
+  $bits = 0;
+  $decoded = '';
+
+  foreach (str_split($k) as $char) {
+    $value = strpos($alphabet, $char);
+    if ($value === false) return false;
+
+    $buffer = ($buffer << 5) | $value;
+    $bits += 5;
+
+    if ($bits >= 8) {
+      $bits -= 8;
+      $decoded .= chr(($buffer >> $bits) & 0xFF);
+      $buffer &= (1 << $bits) - 1;
+    }
+  }
+
+  // A Stellar public account key contains 35 decoded bytes.
+  // Version byte 48 identifies an Ed25519 public account key.
+  if (strlen($decoded) !== 35 || ord($decoded[0]) !== 48) return false;
+
+  // Validate the CRC16-XModem checksum stored in little-endian order.
+  $crc = 0;
+  for ($i = 0; $i < 33; $i++) {
+    $crc ^= ord($decoded[$i]) << 8;
+
+    for ($bit = 0; $bit < 8; $bit++) {
+      if (($crc & 0x8000) !== 0) {
+        $crc = (($crc << 1) ^ 0x1021) & 0xFFFF;
+      } else {
+        $crc = ($crc << 1) & 0xFFFF;
+      }
+    }
+  }
+
+  $storedCrc = ord($decoded[33]) | (ord($decoded[34]) << 8);
+
+  return $crc === $storedCrc;
+}
+function ob_short(?string $s, int $n = 6): string { $s = (string)$s; return mb_strlen($s) > $n * 2 + 1 ? mb_substr($s, 0, $n).'…'.mb_substr($s, -$n) : $s; }
+function ob_safe_url(?string $u): string { $u = trim((string)$u); return ($u !== '' && filter_var($u, FILTER_VALIDATE_URL) && preg_match('#^https?://#i', $u)) ? $u : ''; }
+
+function ob_user_row(int $id): array {
+  static $c = [];
+  if (isset($c[$id])) return $c[$id];
+  try { $s = db()->prepare('SELECT id,full_name,email,role,wallet_address,bio FROM users WHERE id=?'); $s->execute([$id]); return $c[$id] = ($s->fetch() ?: []); }
+  catch (Throwable $e) { return $c[$id] = []; }
+}
+
+// Notifications are derived from real records (reviews, new submissions, payments); only the read state is stored.
+function ob_notifications(int $uid, int $limit = 60): array {
+  $items = [];
+  try {
+    $pdo = db();
+    $s = $pdo->prepare("SELECT s.id,s.status,s.reviewed_at,b.id bid,b.title FROM submissions s JOIN bounties b ON b.id=s.bounty_id WHERE s.contributor_id=? AND s.reviewed_at IS NOT NULL ORDER BY s.reviewed_at DESC LIMIT 30");
+    $s->execute([$uid]);
+    foreach ($s->fetchAll() as $r) {
+      $verb = ['approved'=>'was approved','rejected'=>'was rejected','changes_requested'=>'needs changes'][$r['status']] ?? 'was reviewed';
+      $items[] = ['key'=>'rev-'.$r['id'].'-'.$r['status'],'kind'=>'Submission','text'=>'Your submission to “'.$r['title'].'” '.$verb.'.','at'=>$r['reviewed_at'],'url'=>'/OpenBounty/bounties/view.php?id='.(int)$r['bid']];
+    }
+    $s = $pdo->prepare("SELECT s.id,s.created_at,b.id bid,b.title,u.full_name FROM submissions s JOIN bounties b ON b.id=s.bounty_id JOIN users u ON u.id=s.contributor_id WHERE b.creator_id=? AND s.status IN ('submitted','in_review') ORDER BY s.created_at DESC LIMIT 30");
+    $s->execute([$uid]);
+    foreach ($s->fetchAll() as $r) $items[] = ['key'=>'sub-'.$r['id'],'kind'=>'Bounty','text'=>$r['full_name'].' submitted work to “'.$r['title'].'”.','at'=>$r['created_at'],'url'=>'/OpenBounty/reviews/'];
+    $s = $pdo->prepare("SELECT p.id,p.status,p.updated_at,b.id bid,b.title,p.payer_id FROM payments p JOIN bounties b ON b.id=p.bounty_id JOIN submissions s ON s.id=p.submission_id WHERE p.payer_id=? OR s.contributor_id=? ORDER BY p.updated_at DESC LIMIT 30");
+    $s->execute([$uid, $uid]);
+    foreach ($s->fetchAll() as $r) $items[] = ['key'=>'pay-'.$r['id'].'-'.$r['status'],'kind'=>'Payment','text'=>'Payment for “'.$r['title'].'” is '.str_replace('_',' ',$r['status']).'.','at'=>$r['updated_at'],'url'=>'/OpenBounty/transactions/?id='.(int)$r['id']];
+    usort($items, fn($a, $b) => strcmp((string)$b['at'], (string)$a['at']));
+    $items = array_slice($items, 0, $limit);
+    $read = [];
+    if (ob_table_exists('notification_reads')) {
+      $s = $pdo->prepare('SELECT nkey FROM notification_reads WHERE user_id=?'); $s->execute([$uid]);
+      $read = array_flip(array_column($s->fetchAll(), 'nkey'));
+    }
+    foreach ($items as &$i) $i['read'] = isset($read[$i['key']]);
+  } catch (Throwable $e) { error_log($e->getMessage()); return []; }
+  return $items;
+}
+
+function ob_bounty_card(array $b): string {
+  $id = (int)$b['id'];
+  $isDemo = !empty($b['is_demo']);
+  $href = $isDemo ? '/OpenBounty/bounties/demo-view.php?id='.rawurlencode((string)$b['demo_key']) : '/OpenBounty/bounties/view.php?id='.$id;
+  $demoBadge = $isDemo ? '<span class="ob-badge amber">Demo</span>' : '';
+  $by = e($b['creator'] ?? '');
+  if (!empty($b['uid'])) $by = '<a href="/OpenBounty/profile/?id='.(int)$b['uid'].'">'.$by.'</a>';
+  return '<article class="ob-bc" data-href="'.$href.'" onclick="if(!event.target.closest(\'a,button,form\')) window.location.href=this.dataset.href" onkeydown="if((event.key===\'Enter\'||event.key===\' \')&&!event.target.closest(\'a,button,form\')){event.preventDefault();window.location.href=this.dataset.href}" role="link" tabindex="0"><div class="ob-bc-main"><div class="ob-bc-top"><div class="ob-tags"><span class="ob-skill">'.e($b['skill'] ?? 'General').'</span>'.ob_diff($b['difficulty'] ?? null).'</div>'.$demoBadge.ob_badge((string)$b['status']).'</div>'
+    .'<h3><a href="'.$href.'">'.e($b['title']).'</a></h3>'
+    .'<p>'.e(mb_strimwidth(preg_replace('/\s+/', ' ', (string)($b['description'] ?? '')), 0, 150, '…')).'</p>'
+    .'<div class="ob-by"><span class="ob-avatar">'.e(ob_initials((string)($b['creator'] ?? '?'))).'</span>'.$by.'</div></div>'
+    .'<div class="ob-bc-foot"><div class="ob-reward">'.e(xlm($b['reward_xlm'])).' <small>XLM</small></div><div class="ob-muted" style="font-size:12.5px">'.ob_deadline($b['deadline'] ?? null).'</div></div></article>';
+}

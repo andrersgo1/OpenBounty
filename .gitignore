@@ -1,0 +1,65 @@
+node_modules/
+.next/
+.env
+.env.local
+*.log
+.DS_Store
+/config.local.php
+/storage/
+*.log
+
+# Additional OpenBounty publishing safeguards
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+config.local.php
+local-config.php
+
+# Dependencies and generated builds
+/vendor/
+/node_modules/
+/.next/
+/out/
+/dist/
+/build/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.old
+
+# Database dumps and backups
+*.dump
+*.sql.gz
+*.sqlite
+*.sqlite3
+database-backups/
+db-backups/
+backups/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local project backups
+/_devorbit-backup-*/
+
+# OpenBounty local configuration - do not publish
+/config.php
+/config.local.php
+/.env
+/.env.*
+!/.env.example
+
+# Local backups
+/_devorbit-backup-*/

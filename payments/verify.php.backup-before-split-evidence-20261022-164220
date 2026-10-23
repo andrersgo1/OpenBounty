@@ -1,0 +1,365 @@
+<?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/../includes/bootstrap.php';
+
+require_login();
+
+$user = current_user();
+$userId = (int)($user['id'] ?? 0);
+
+function ob_verify_page(string $title, string $message, int $status = 200): never
+{
+    http_response_code($status);
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store, private');
+    header('X-Content-Type-Options: nosniff');
+
+    echo '<!doctype html><html lang="en"><meta charset="utf-8">';
+    echo '<meta name="viewport" content="width=device-width,initial-scale=1">';
+    echo '<title>' . e($title) . ' - OpenBounty</title>';
+    echo '<body style="font-family:system-ui;max-width:720px;margin:40px auto;padding:20px;background:#151329;color:#eeeaff">';
+    echo '<h1>' . e($title) . '</h1>';
+    echo '<p style="line-height:1.7;overflow-wrap:anywhere">' . e($message) . '</p>';
+    echo '<p><a style="color:#b7a8ff" href="/OpenBounty/payments/">Return to OpenBounty payments</a></p>';
+    echo '</body></html>';
+    exit;
+}
+
+function ob_verify_intent(string $token): array
+{
+    $secretPath = 'C:\\laragon\\secrets\\openbounty-payment.secret';
+    $secret = @file_get_contents($secretPath);
+
+    if (!is_string($secret) || strlen(trim($secret)) < 40) {
+        throw new RuntimeException('Payment verification is not configured.');
+    }
+
+    $parts = explode('.', $token);
+    if (count($parts) !== 2) {
+        throw new RuntimeException('Invalid payment intent.');
+    }
+
+    [$encoded, $providedSignature] = $parts;
+
+    if (!preg_match('/^[A-Za-z0-9_-]+$/', $encoded) ||
+        !preg_match('/^[a-f0-9]{64}$/i', $providedSignature)) {
+        throw new RuntimeException('Invalid payment intent.');
+    }
+
+    $expectedSignature = hash_hmac('sha256', $encoded, trim($secret));
+    if (!hash_equals($expectedSignature, $providedSignature)) {
+        throw new RuntimeException('Payment intent signature is invalid.');
+    }
+
+    $base64 = strtr($encoded, '-_', '+/');
+    $base64 .= str_repeat('=', (4 - strlen($base64) % 4) % 4);
+    $decoded = base64_decode($base64, true);
+
+    if ($decoded === false) {
+        throw new RuntimeException('Invalid payment intent encoding.');
+    }
+
+    $payload = json_decode($decoded, true, 512, JSON_THROW_ON_ERROR);
+
+    foreach (['payment_id', 'bounty_id', 'submission_id', 'payer_id'] as $key) {
+        if (!isset($payload[$key]) || !is_int($payload[$key]) || $payload[$key] < 1) {
+            throw new RuntimeException('Payment intent fields are invalid.');
+        }
+    }
+
+    if (($payload['network'] ?? null) !== 'stellar_testnet' ||
+        !isset($payload['exp']) || !is_int($payload['exp']) ||
+        ($payload['exp'] + 2592000) <= time() ||
+        !isset($payload['from'], $payload['to'], $payload['amount']) ||
+        !preg_match('/^G[A-Z2-7]{55}$/', $payload['from']) ||
+        !preg_match('/^G[A-Z2-7]{55}$/', $payload['to']) ||
+        !preg_match('/^[0-9]+\.[0-9]{7}$/', $payload['amount']) ||
+        (float)$payload['amount'] <= 0) {
+        throw new RuntimeException('Payment intent is invalid or expired.');
+    }
+
+    return $payload;
+}
+
+function ob_amount_normalize(string $amount): string
+{
+    if (!preg_match('/^([0-9]+)(?:\.([0-9]{1,7}))?$/', $amount, $m)) {
+        throw new RuntimeException('Invalid XLM amount returned by Stellar.');
+    }
+
+    $whole = ltrim($m[1], '0');
+    $whole = $whole === '' ? '0' : $whole;
+    $fraction = rtrim($m[2] ?? '', '0');
+
+    return $whole . ($fraction !== '' ? '.' . $fraction : '');
+}
+
+function ob_horizon_get(string $url): array
+{
+    $ch = curl_init($url);
+    if ($ch === false) {
+        throw new RuntimeException('Could not initialize Stellar verification.');
+    }
+
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        CURLOPT_USERAGENT => 'OpenBounty-Payment-Verifier/1.0',
+    ]);
+
+    $body = curl_exec($ch);
+    $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if (!is_string($body) || $status < 200 || $status >= 300) {
+        throw new RuntimeException(
+            $status === 404
+                ? 'Stellar Testnet has not found this transaction yet.'
+                : 'Could not verify the transaction with Stellar Testnet. Try again later.'
+        );
+    }
+
+    $data = json_decode($body, true);
+    if (!is_array($data)) {
+        throw new RuntimeException('Stellar returned an unreadable verification response.');
+    }
+
+    return $data;
+}
+
+if ($userId < 1) {
+    ob_verify_page('Sign in required', 'Sign in to the payer account before verifying this payment.', 401);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $intentToken = (string)($_GET['intent'] ?? '');
+    $txHash = strtolower(trim((string)($_GET['txHash'] ?? '')));
+
+    if ($intentToken === '' || !preg_match('/^[a-f0-9]{64}$/', $txHash)) {
+        ob_verify_page('Invalid verification link', 'Return to the payment page and open the verification link again.', 400);
+    }
+
+    try {
+        $intent = ob_verify_intent($intentToken);
+    } catch (Throwable $ex) {
+        ob_verify_page('Cannot verify payment', $ex->getMessage(), 400);
+    }
+
+    if ($intent['payer_id'] !== $userId) {
+        ob_verify_page('Wrong account', 'Sign in with the OpenBounty account that created this bounty.', 403);
+    }
+
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store, private');
+    header('X-Content-Type-Options: nosniff');
+
+    echo '<!doctype html><html lang="en"><meta charset="utf-8">';
+    echo '<meta name="viewport" content="width=device-width,initial-scale=1">';
+    echo '<title>Verify payment - OpenBounty</title>';
+    echo '<body style="font-family:system-ui;max-width:720px;margin:40px auto;padding:20px;background:#151329;color:#eeeaff">';
+    echo '<h1>Verify Stellar Testnet payment</h1>';
+    echo '<p>OpenBounty will independently check the transaction, sender, recipient, native XLM asset, amount, and payment record. A transaction hash by itself is not proof of payment.</p>';
+    echo '<p><strong>Amount:</strong> ' . e($intent['amount']) . ' XLM</p>';
+    echo '<p><strong>Recipient:</strong> ' . e($intent['to']) . '</p>';
+    echo '<p><strong>Transaction hash:</strong><br>' . e($txHash) . '</p>';
+    echo '<form method="post">';
+    echo '<input type="hidden" name="csrf" value="' . e(csrf_token()) . '">';
+    echo '<input type="hidden" name="intent" value="' . e($intentToken) . '">';
+    echo '<input type="hidden" name="txHash" value="' . e($txHash) . '">';
+    echo '<button style="padding:12px 18px;border:0;border-radius:8px;background:#8b78ff;color:white;font-weight:700" type="submit">Verify transaction</button>';
+    echo '</form></body></html>';
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('Allow: GET, POST');
+    ob_verify_page('Method not allowed', 'Use the payment verification form.', 405);
+}
+
+check_csrf();
+
+try {
+    $intentToken = (string)($_POST['intent'] ?? '');
+    $txHash = strtolower(trim((string)($_POST['txHash'] ?? '')));
+
+    if (!preg_match('/^[a-f0-9]{64}$/', $txHash)) {
+        throw new RuntimeException('Transaction hash format is invalid.');
+    }
+
+    $intent = ob_verify_intent($intentToken);
+
+    if ($intent['payer_id'] !== $userId) {
+        ob_verify_page('Wrong account', 'Sign in with the OpenBounty account that created this bounty.', 403);
+    }
+
+    $horizon = 'https://horizon-testnet.stellar.org';
+    $transaction = ob_horizon_get($horizon . '/transactions/' . rawurlencode($txHash));
+
+    if (($transaction['successful'] ?? false) !== true ||
+        strtolower((string)($transaction['hash'] ?? '')) !== $txHash ||
+        (string)($transaction['source_account'] ?? '') !== $intent['from']) {
+        throw new RuntimeException('The transaction failed or its hash/source does not match the payment intent.');
+    }
+
+    $operations = ob_horizon_get(
+        $horizon . '/transactions/' . rawurlencode($txHash) . '/operations?limit=200&order=asc'
+    );
+
+    // Split the total into exact Stellar stroops (1 XLM = 10,000,000 stroops).
+    $totalParts = explode('.', ob_amount_normalize($intent['amount']), 2);
+    $whole = (int)$totalParts[0];
+    $fraction = (int)str_pad($totalParts[1] ?? '', 7, '0');
+    $totalStroops = ($whole * 10000000) + $fraction;
+
+    $winnerStroops = intdiv($totalStroops * 90, 100);
+    $communityStroops = $totalStroops - $winnerStroops;
+
+    if ($winnerStroops <= 0 || $communityStroops <= 0) {
+        throw new RuntimeException('The bounty amount is too small to split into two positive payments.');
+    }
+
+    $formatStroops = static function (int $stroops): string {
+        $whole = intdiv($stroops, 10000000);
+        $fraction = str_pad((string)($stroops % 10000000), 7, '0', STR_PAD_LEFT);
+        return $whole . '.' . $fraction;
+    };
+
+    $expectedWinnerAmount = $formatStroops($winnerStroops);
+    $expectedCommunityAmount = $formatStroops($communityStroops);
+    $communityWallet = 'GBAUZRASWWFTCNPCJ5TURWDVTE5AGRHUA6LRR7HS24MCUOBJ7MCWKIJJ';
+
+    if ($intent['to'] === $communityWallet) {
+        throw new RuntimeException('Winner and community wallet must be different.');
+    }
+
+    $winnerMatches = 0;
+    $communityMatches = 0;
+
+    foreach (($operations['_embedded']['records'] ?? []) as $operation) {
+        if (($operation['type'] ?? '') !== 'payment') {
+            continue;
+        }
+
+        $source = (string)($operation['source_account'] ?? $transaction['source_account'] ?? '');
+        $destination = (string)($operation['to'] ?? '');
+        $assetType = (string)($operation['asset_type'] ?? '');
+        $amount = (string)($operation['amount'] ?? '');
+
+        if ($source !== $intent['from'] || $assetType !== 'native') {
+            continue;
+        }
+
+        $normalizedAmount = ob_amount_normalize($amount);
+
+        if ($destination === $intent['to'] &&
+            $normalizedAmount === ob_amount_normalize($expectedWinnerAmount)) {
+            $winnerMatches++;
+        }
+
+        if ($destination === $communityWallet &&
+            $normalizedAmount === ob_amount_normalize($expectedCommunityAmount)) {
+            $communityMatches++;
+        }
+    }
+
+    if ($winnerMatches !== 1 || $communityMatches !== 1) {
+        throw new RuntimeException(
+            'Verification failed: the transaction must contain exactly one 90% winner payment and one 10% community payment with the expected amounts.'
+        );
+    }
+
+    $pdo = db();
+    $pdo->beginTransaction();
+
+    try {
+        $stmt = $pdo->prepare(
+            'SELECT p.id, p.bounty_id, p.submission_id, p.payer_id,
+                    p.recipient_wallet, p.amount_xlm, p.network, p.status,
+                    p.transaction_hash, b.status AS bounty_status,
+                    s.status AS submission_status
+             FROM payments p
+             JOIN bounties b ON b.id = p.bounty_id
+             JOIN submissions s ON s.id = p.submission_id
+             WHERE p.id = ? AND p.bounty_id = ? AND p.submission_id = ?
+             FOR UPDATE'
+        );
+        $stmt->execute([
+            $intent['payment_id'],
+            $intent['bounty_id'],
+            $intent['submission_id'],
+        ]);
+        $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$payment ||
+            (int)$payment['payer_id'] !== $userId ||
+            (int)$payment['payer_id'] !== $intent['payer_id'] ||
+            (string)$payment['recipient_wallet'] !== $intent['to'] ||
+            (string)$payment['network'] !== 'stellar_testnet' ||
+            ob_amount_normalize((string)$payment['amount_xlm']) !== ob_amount_normalize($intent['amount']) ||
+            !in_array($payment['submission_status'], ['approved'], true)) {
+            throw new RuntimeException('The current OpenBounty payment record does not match this intent.');
+        }
+
+        if ($payment['status'] === 'verified' &&
+            strtolower((string)$payment['transaction_hash']) === $txHash) {
+            $pdo->commit();
+            ob_verify_page('Payment already verified', 'This exact transaction was already verified by OpenBounty.');
+        }
+
+        if (!in_array($payment['status'], ['pending', 'prepared', 'submitted', 'confirmed'], true)) {
+            throw new RuntimeException('This payment record is not eligible for verification.');
+        }
+
+        if (!in_array($payment['bounty_status'], ['payment_pending'], true)) {
+            throw new RuntimeException('The bounty is no longer waiting for this payment.');
+        }
+
+        $update = $pdo->prepare(
+            "UPDATE payments
+             SET status = 'verified', transaction_hash = ?, verification_json = ?,
+                 updated_at = NOW()
+             WHERE id = ? AND status IN ('pending','prepared','submitted','confirmed')"
+        );
+
+        $verification = json_encode([
+            'network' => 'stellar_testnet',
+            'verified_at' => gmdate('c'),
+            'transaction_hash' => $txHash,
+            'source_account' => $intent['from'],
+            'destination' => $intent['to'],
+            'amount_xlm' => $intent['amount'],
+            'asset_type' => 'native',
+            'stellar_successful' => true,
+        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+
+        $update->execute([$txHash, $verification, $payment['id']]);
+
+        if ($update->rowCount() !== 1) {
+            throw new RuntimeException('Payment status changed during verification. Refresh and check the payment record.');
+        }
+
+        $bountyUpdate = $pdo->prepare(
+            "UPDATE bounties SET status = 'paid' WHERE id = ? AND status = 'payment_pending'"
+        );
+        $bountyUpdate->execute([$payment['bounty_id']]);
+
+        if ($bountyUpdate->rowCount() !== 1) {
+            throw new RuntimeException('Bounty status changed during verification. No verification update was committed.');
+        }
+
+        $pdo->commit();
+    } catch (Throwable $ex) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $ex;
+    }
+
+    ob_verify_page('Payment verified', 'Stellar Testnet confirms the matching native XLM transaction. OpenBounty marked the payment verified and the bounty paid.');
+} catch (Throwable $ex) {
+    ob_verify_page('Payment not verified', $ex->getMessage(), 400);
+}
