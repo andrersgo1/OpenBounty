@@ -63,3 +63,6 @@ Thumbs.db
 
 # Local backups
 /_devorbit-backup-*/
+
+# Backup files
+*.backup*
