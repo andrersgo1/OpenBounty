@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/payment-intent.php';
+
 // Shared signed-token verification for DevOrbit payments, extracted from
 // payments/verify.php so the exact production validators can be exercised by
 // the CLI regression suite (tests/php/attestation-checks.php in the signer
@@ -24,9 +26,7 @@ function ob_verify_secret(?string $secretOverride = null): string
         return $secretOverride;
     }
 
-    $secret = trim((string)@file_get_contents(
-        'C:\\laragon\\secrets\\openbounty-payment.secret'
-    ));
+    $secret = trim((string)@file_get_contents(ob_payment_secret_path()));
 
     if (strlen($secret) < 40) {
         throw new RuntimeException('Payment verification is not configured.');

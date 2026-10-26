@@ -11,11 +11,20 @@ declare(strict_types=1);
 // Token format (mirrored by the Next.js signer in lib/openbounty-intent.ts):
 //   base64url(UTF-8 JSON payload) . "." . hex(HMAC_SHA256(secret, encoded))
 
+// The secret path can be configured per environment.
+// Keep the existing Laragon path as the default.
+function ob_payment_secret_path(): string
+{
+    $configured = getenv('OPENBOUNTY_PAYMENT_SECRET_FILE');
+
+    return is_string($configured) && $configured !== ''
+        ? $configured
+        : 'C:\\laragon\\secrets\\openbounty-payment.secret';
+}
+
 function ob_payment_intent_secret(): string
 {
-    $secret = trim((string)@file_get_contents(
-        'C:\\laragon\\secrets\\openbounty-payment.secret'
-    ));
+    $secret = trim((string)@file_get_contents(ob_payment_secret_path()));
 
     if (strlen($secret) < 40) {
         throw new RuntimeException('Payment signing secret is unavailable.');
